@@ -50,6 +50,7 @@ class ExpertSysController:
 
     rule_re = re.compile(r'\d{1,2}\. ЕСЛИ (?P<cond>\w+) ТО (?P<res>\w+) \((?P<prob>\d{1,3})%\)')
 
+
     def load_rules_from_file(self, file):
         self.model.rules = OrderedDict()
         for line in file:
