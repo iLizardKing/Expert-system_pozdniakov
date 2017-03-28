@@ -1,6 +1,8 @@
 from tkinter import *
 from tkinter import messagebox
+from tkinter import filedialog
 from collections import OrderedDict
+import re
 
 
 class ExpertSysModel:
@@ -45,6 +47,29 @@ class ExpertSysController:
             condition = list(self.model.rules)[num]
             del self.model.rules[condition]
             self.view.refresh_rules()
+
+    rule_re = re.compile(r'\d{1,2}\. ЕСЛИ (?P<cond>\w+) ТО (?P<res>\w+) \((?P<prob>\d{1,3})%\)')
+
+    def load_rules_from_file(self, file):
+        self.model.rules = OrderedDict()
+        for line in file:
+            match = __class__.rule_re.match(line)
+            if match:
+                condition = match.group('cond')
+                result = match.group('res')
+                probability = int(match.group('prob'))
+                self.model.add_rule(condition, result, probability)
+            else:
+                print('Ошибка! Очередная строка не соответствует шаблону.\n"{}"'.format(line))
+        file.close()
+        self.view.refresh_rules()
+
+    def save_rules_to_file(self, file):
+        for num, rule in enumerate(self.model.rules.items()):
+            condition, result, probability = rule[0], rule[1][0], rule[1][1]
+            line = '{0}. ЕСЛИ {1} ТО {2} ({3}%)'.format(num+1, condition, result, probability)
+            print(line, file=file)
+        file.close()
 
 
 class ExpertSysView(Frame):
@@ -180,10 +205,13 @@ class ExpertSysView(Frame):
             self.rules_txt.config(state='disabled')
 
     def save_rules(self):
-        print('save rules')
+        file_var = filedialog.asksaveasfile(mode='w', defaultextension=".rules")
+        self.controller.save_rules_to_file(file_var)
 
     def load_rules(self):
-        print('load rules')
+        filename = filedialog.askopenfilename(filetypes=[('*.rules files', '*.rules')])
+        file_var = open(filename, 'r')
+        self.controller.load_rules_from_file(file_var)
 
 
 expert_sys_model = ExpertSysModel()
