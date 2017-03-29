@@ -9,12 +9,20 @@ class ExpertSysModel:
     ''' Хранение данных и операций по обработке данных '''
     def __init__(self):
         self.rules = OrderedDict()
+        self.conditions = list()
+        self.result = list()
 
     def add_rule(self, condition, result, probability):
         self.rules[condition] = (result, probability)
 
     def get_rules_amount(self):
         return len(self.rules)
+
+    def add_condition(self, condition, probability):
+        self.conditions.append((condition, probability))
+
+    def get_conditions_amount(self):
+        return len(self.conditions)
 
 
 class ExpertSysController:
@@ -43,7 +51,7 @@ class ExpertSysController:
             else:
                 self.rule_view.ok_message('Правило "{}" уже есть в системе'.format(condition))
 
-    def delete_rule(self):
+    def del_rule(self):
         num = self.view.delete_rule_num.get()
         if num:
             num = int(num) - 1
@@ -51,10 +59,16 @@ class ExpertSysController:
             del self.model.rules[condition]
             self.rule_view.refresh_rules()
 
-    def add_condition(self):
-        print('add_condition')
+    def add_new_condition(self):
+        ''' добавление нового состояния в МОДЕЛЬ '''
+        condition = self.cond_view.conditions_var.get()
+        probability = int(self.cond_view.probability_var.get())
+        if condition:
+            self.model.conditions.append((condition, probability))
 
-    def delete_condition(self):
+        print(self.model.conditions)
+
+    def del_condition(self):
         print('delete_condition')
 
     rule_re = re.compile(r'\d{1,2}\. ЕСЛИ (?P<cond>\w+) ТО (?P<res>\w+) \((?P<prob>\d{1,3})%\)')
@@ -110,7 +124,7 @@ class RulesView(Frame):
                                  bd=3,
                                  text='Удалить',
                                  bg='#eebebe',
-                                 command=self.controller.delete_rule,
+                                 command=self.controller.del_rule,
                                  state='disabled',
                                  **config)
         self.delete_rule_num = StringVar(0)
@@ -131,8 +145,8 @@ class RulesView(Frame):
         self.rules_txt = Text(frame_text,
                               width=40,
                               height=15,
-                              state='disabled',
                               wrap='word',
+                              state='disabled',
                               **config)
         scrollbar = Scrollbar(frame_text,
                               command=self.rules_txt.yview)
@@ -187,16 +201,17 @@ class RulesView(Frame):
                           bg='#bebeee',
                           command=self.load_rules,
                           **config)
-        save_but = Button(frame_loadsave,
+        self.save_but = Button(frame_loadsave,
                           bd=3,
                           text='Сохранить правила',
                           bg='#bebeee',
+                          state='disabled',
                           command=self.save_rules,
                           **config)
         # load|safe packed
         frame_loadsave.pack(side='top', fill='x')
         load_but.pack(side='left', expand=True, fill='x')
-        save_but.pack(side='right', expand=True, fill='x')
+        self.save_but.pack(side='right', expand=True, fill='x')
 
     def ok_message(self, message):
         messagebox.showinfo('Ошибка', message)
@@ -208,6 +223,7 @@ class RulesView(Frame):
             self.spinbox.config(state='normal', from_=1, to=rules_amount)
             self.delete_but.config(state='normal')
             self.delete_rule_num.set(1)
+            self.save_but.config(state='normal')
             self.rules_txt.config(state='normal')
             self.rules_txt.delete('1.0', END)
             for num, rule in enumerate(self.model.rules.items()):
@@ -224,13 +240,19 @@ class RulesView(Frame):
             self.delete_rule_num.set(0)
             self.spinbox.config(from_=0, to=0, state='disabled')
             self.delete_but.config(state='disabled')
+            self.save_but.config(state='disabled')
             self.rules_txt.config(state='normal')
             self.rules_txt.delete('1.0', END)
             self.rules_txt.config(state='disabled')
 
     def save_rules(self):
-        file_var = filedialog.asksaveasfile(mode='w', defaultextension=".rules")
-        self.controller.save_rules_to_file(file_var)
+        if self.model.rules:
+            file_var = filedialog.asksaveasfile(mode='w',
+                                                defaultextension=".rules",
+                                                filetypes=[('rules files', '.rules'), ('all files', '.*')],
+                                                title="Сохранение условий. Введите имя файла.")
+            if file_var:
+                self.controller.save_rules_to_file(file_var)
 
     def load_rules(self):
         filename = filedialog.askopenfilename(filetypes=[('*.rules files', '*.rules')])
@@ -268,14 +290,13 @@ class ConditionView(Frame):
                                     width=9, bd=3,
                                     text='Добавить',
                                     bg='#bed6be',
-                                    command=self.controller.add_condition,
+                                    command=self.controller.add_new_condition,
                                     **config)
         # PACKED add conditions with entry, scroll & button
         frame_add_parent.pack(side='top', fill='x')
         frame_add_child.pack(side='left', expand=True, fill='x')
-        Label(frame_add_child, text="Состояние:", **config).pack(anchor=W)
+        Label(frame_add_child, text="Состояние и степень:", **config).pack(anchor=W)
         conditions_ent.pack(fill='x')
-        Label(frame_add_child, text="Степень:", **config).pack(anchor=W)
         probability_scl.pack(fill='x')
         conditions_add_but.pack(side='right', fill='both', pady=5)
 
@@ -284,27 +305,27 @@ class ConditionView(Frame):
         frame_text_parent = Frame(self)
         frame_text_child = Frame(frame_text_parent)
         self.conditions_txt = Text(frame_text_child,
-                                   width=20,
-                                   height=10,
-                                   state='disabled',
+                                   width=25,
+                                   height=12,
                                    wrap='word',
+                                   state='disabled',
                                    **config)
         conditions_scrollbar = Scrollbar(frame_text_child,
                                          command=self.conditions_txt.yview)
         self.conditions_txt.config(yscrollcommand=conditions_scrollbar.set)
-        self.delete_rule_num = StringVar(0)
-        self.delete_spinbox = Spinbox(frame_text_parent,
+        self.del_conditions_num_var = StringVar(0)
+        self.del_conditions_num_spin = Spinbox(frame_text_parent,
                                       width=5,
                                       from_=0, to=0,
-                                      textvariable=self.delete_rule_num,
+                                      textvariable=self.del_conditions_num_var,
                                       state='disabled',
                                       **config)
-        self.conditions_delete_but = Button(frame_text_parent,
+        self.conditions_del_but = Button(frame_text_parent,
                                             width=9,
                                             text='Удалить',
                                             bg='#eebebe',
                                             state='disabled',
-                                            command=self.controller.delete_condition,
+                                            command=self.controller.del_condition,
                                             **config)
         save_conditions_but = Button(frame_text_parent,
                                      width=9, bd=3,
@@ -320,12 +341,12 @@ class ConditionView(Frame):
                                      **config)
         # PACKED conditions text with opportunity to delete (spinbox & button),
         # save & load buttons
-        frame_text_parent.pack(side='top', fill='both')
-        frame_text_child.pack(side='left', expand=True, fill='x')
+        frame_text_parent.pack(side='top', expand=True, fill='both')
+        frame_text_child.pack(side='left', expand=True, fill='both')
         self.conditions_txt.pack(side='left', expand=True, fill='both', pady=5)
         conditions_scrollbar.pack(side='left', fill='y', pady=5)
-        self.delete_spinbox.pack(side='top',fill='x', pady=5)
-        self.conditions_delete_but.pack(side='top', fill='x', pady=5)
+        self.del_conditions_num_spin.pack(side='top',fill='x', pady=5)
+        self.conditions_del_but.pack(side='top', fill='x', pady=5)
         save_conditions_but.pack(side='top', fill='x', expand=True, anchor='s')
         load_conditions_but.pack(side='bottom', fill='x', pady=5)
 
@@ -334,8 +355,9 @@ class ConditionView(Frame):
         frame_result_child_txt = Frame(frame_result_parent)
         frame_result_child_btn = Frame(frame_result_parent)
         self.result_txt = Text(frame_result_child_txt,
-                               width=30,
-                               height=10,
+                               width=35,
+                               height=8,
+                               state='disabled',
                                wrap='word',
                                **config)
         result_scrollbar = Scrollbar(frame_result_child_txt,
@@ -354,8 +376,8 @@ class ConditionView(Frame):
                                  **config)
         # PACKED result text, start button, save result button
         frame_result_parent.pack(side='bottom', fill='x')
-        frame_result_child_txt.pack(side='top', fill='both', expand=True)
-        self.result_txt.pack(side='left', expand=True, fill='both')
+        frame_result_child_txt.pack(side='top', expand=True, fill='x')
+        self.result_txt.pack(side='left', expand=True, fill='x')
         result_scrollbar.pack(side='left', fill='y')
         frame_result_child_btn.pack(side='bottom', fill='both')
         save_result_but.pack(side='left', expand=True, fill='x')
@@ -383,10 +405,10 @@ expert_sys_model = ExpertSysModel()
 expert_sys_controller = ExpertSysController(expert_sys_model)
 
 root = Tk()
-root.title('Expert System')
+root.title('Экспертная система')
 root.config(bg='grey')
-root.geometry('900x640+100+100')
-root.minsize(width=470, height=640)
+root.geometry('889x632+100+100')
+root.minsize(width=472, height=632)
 config = {'font': ('Arial', '14')}
 
 rules_form = RulesView(
