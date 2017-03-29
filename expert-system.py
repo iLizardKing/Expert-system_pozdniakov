@@ -48,8 +48,13 @@ class ExpertSysController:
             del self.model.rules[condition]
             self.view.refresh_rules()
 
-    rule_re = re.compile(r'\d{1,2}\. ЕСЛИ (?P<cond>\w+) ТО (?P<res>\w+) \((?P<prob>\d{1,3})%\)')
+    def add_condition(self):
+        print('add_condition')
 
+    def delete_condition(self):
+        print('delete_condition')
+
+    rule_re = re.compile(r'\d{1,2}\. ЕСЛИ (?P<cond>\w+) ТО (?P<res>\w+) \((?P<prob>\d{1,3})%\)')
 
     def load_rules_from_file(self, file):
         self.model.rules = OrderedDict()
@@ -72,22 +77,34 @@ class ExpertSysController:
             print(line, file=file)
         file.close()
 
+    def load_conditions_from_file(self, file):
+        print('controller - load_conditions_from_file')
 
-class ExpertSysView(Frame):
-    ''' Интерфейс к программе '''
+    def save_conditions_to_file(self, file):
+        print('controller - save_conditions_to_file')
+
+    def save_result_to_file(self, file):
+        print('controller - save_result_to_file')
+
+    def start_processing(self):
+        print('controller - start processing')
+
+
+class RulesView(Frame):
     def __init__(self, model=None, controller=None, master=None, **config):
         self.model = model
         self.controller = controller
         self.controller.set_view(self)
         super().__init__(master)
         self.configure(bg='black')
-        self.pack(expand='yes', fill='both', padx=5, pady=5)
+        self.pack(side='left', expand='yes', fill='both', padx=5, pady=5)
         self.create_widgets(**config)
 
     def create_widgets(self, **config):
         # delete
         frame_delete = Frame(self)
         self.delete_but = Button(frame_delete,
+                                 bd=3,
                                  text='Удалить',
                                  bg='#eebebe',
                                  command=self.controller.delete_rule,
@@ -143,6 +160,7 @@ class ExpertSysView(Frame):
                                 tickinterval=10,
                                 resolution=1)
         add_rules_but = Button(frame_add_parent,
+                               bd=3,
                                text="Добавить",
                                bg='#bed6be',
                                command=self.controller.add_new_rule,
@@ -161,11 +179,13 @@ class ExpertSysView(Frame):
         # load|safe
         frame_loadsave = Frame(self)
         load_but = Button(frame_loadsave,
+                          bd=3,
                           text='Загрузить правила',
                           bg='#bebeee',
                           command=self.load_rules,
                           **config)
         save_but = Button(frame_loadsave,
+                          bd=3,
                           text='Сохранить правила',
                           bg='#bebeee',
                           command=self.save_rules,
@@ -215,19 +235,168 @@ class ExpertSysView(Frame):
         self.controller.load_rules_from_file(file_var)
 
 
+class ConditionView(Frame):
+    def __init__(self, model=None, controller=None, master=None, **config):
+        self.model = model
+        self.controller = controller
+        self.controller.set_view(self)
+        super().__init__(master)
+        self.configure(bg='black')
+        self.pack(side='left', expand='yes', fill='both', padx=5, pady=5)
+        self.create_widgets(**config)
+
+    def create_widgets(self, **config):
+        # add conditions with entry, scroll & button
+        frame_add_parent = Frame(self)
+        frame_add_child = Frame(frame_add_parent)
+        self.conditions_var = StringVar()
+        conditions_ent = Entry(frame_add_child,
+                               textvariable=self.conditions_var,
+                               fg='grey',
+                               **config)
+        self.probability_var = IntVar(value=100)
+        probability_scl = Scale(frame_add_child,
+                                variable=self.probability_var,
+                                orient=HORIZONTAL,
+                                from_=0, to=100,
+                                tickinterval=10,
+                                resolution=1)
+        conditions_add_but = Button(frame_add_parent,
+                                    width=9, bd=3,
+                                    text='Добавить',
+                                    bg='#bed6be',
+                                    command=self.controller.add_condition,
+                                    **config)
+        # PACKED add conditions with entry, scroll & button
+        frame_add_parent.pack(side='top', fill='x')
+        frame_add_child.pack(side='left', expand=True, fill='x')
+        Label(frame_add_child, text="Состояние:", **config).pack(anchor=W)
+        conditions_ent.pack(fill='x')
+        Label(frame_add_child, text="Степень:", **config).pack(anchor=W)
+        probability_scl.pack(fill='x')
+        conditions_add_but.pack(side='right', fill='both', pady=5)
+
+        # conditions text with opportunity to delete (spinbox & button),
+        # save & load buttons
+        frame_text_parent = Frame(self)
+        frame_text_child = Frame(frame_text_parent)
+        self.conditions_txt = Text(frame_text_child,
+                                   width=20,
+                                   height=10,
+                                   state='disabled',
+                                   wrap='word',
+                                   **config)
+        conditions_scrollbar = Scrollbar(frame_text_child,
+                                         command=self.conditions_txt.yview)
+        self.conditions_txt.config(yscrollcommand=conditions_scrollbar.set)
+        self.delete_rule_num = StringVar(0)
+        self.delete_spinbox = Spinbox(frame_text_parent,
+                                      width=5,
+                                      from_=0, to=0,
+                                      textvariable=self.delete_rule_num,
+                                      state='disabled',
+                                      **config)
+        self.conditions_delete_but = Button(frame_text_parent,
+                                            width=9,
+                                            text='Удалить',
+                                            bg='#eebebe',
+                                            state='disabled',
+                                            command=self.controller.delete_condition,
+                                            **config)
+        save_conditions_but = Button(frame_text_parent,
+                                     width=9, bd=3,
+                                     text='Сохранить\nсостояние',
+                                     bg='#bebeee',
+                                     command=self.save_conditions,
+                                     **config)
+        load_conditions_but = Button(frame_text_parent,
+                                     width=9, bd=3,
+                                     text='Загрузить\nсостояние',
+                                     bg='#bebeee',
+                                     command=self.load_conditions,
+                                     **config)
+        # PACKED conditions text with opportunity to delete (spinbox & button),
+        # save & load buttons
+        frame_text_parent.pack(side='top', fill='both')
+        frame_text_child.pack(side='left', expand=True, fill='x')
+        self.conditions_txt.pack(side='left', expand=True, fill='both', pady=5)
+        conditions_scrollbar.pack(side='left', fill='y', pady=5)
+        self.delete_spinbox.pack(side='top',fill='x', pady=5)
+        self.conditions_delete_but.pack(side='top', fill='x', pady=5)
+        save_conditions_but.pack(side='top', fill='x', expand=True, anchor='s')
+        load_conditions_but.pack(side='bottom', fill='x', pady=5)
+
+        # result text, start button, save result button
+        frame_result_parent = Frame(self, bg='#ffffd0')
+        frame_result_child_txt = Frame(frame_result_parent)
+        frame_result_child_btn = Frame(frame_result_parent)
+        self.result_txt = Text(frame_result_child_txt,
+                               width=30,
+                               height=10,
+                               wrap='word',
+                               **config)
+        result_scrollbar = Scrollbar(frame_result_child_txt,
+                              command=self.result_txt.yview)
+        self.result_txt.config(yscrollcommand=result_scrollbar.set)
+        start_but = Button(frame_result_child_btn,
+                           bd=3,
+                           text='Начать обработку',
+                           command=self.controller.start_processing,
+                           **config)
+        save_result_but = Button(frame_result_child_btn,
+                                 bd=3,
+                                 text='Сохранить результат',
+                                 bg='#bebeee',
+                                 command=self.save_result,
+                                 **config)
+        # PACKED result text, start button, save result button
+        frame_result_parent.pack(side='bottom', fill='x')
+        frame_result_child_txt.pack(side='top', fill='both', expand=True)
+        self.result_txt.pack(side='left', expand=True, fill='both')
+        result_scrollbar.pack(side='left', fill='y')
+        frame_result_child_btn.pack(side='bottom', fill='both')
+        save_result_but.pack(side='left', expand=True, fill='x')
+        start_but.pack(side='right', expand=True, fill='x')
+
+
+    def load_conditions(self):
+        print('view - load conditions')
+        file = None
+        self.controller.load_conditions_from_file(file)
+
+    def save_conditions(self):
+        print('view - save conditions')
+        file = None
+        self.controller.save_conditions_to_file(file)
+
+    def save_result(self):
+        print('view - save result')
+        file = None
+        self.controller.save_result_to_file(file)
+
+
+
+
 expert_sys_model = ExpertSysModel()
 expert_sys_controller = ExpertSysController(expert_sys_model)
 
 root = Tk()
 root.title('Expert System')
-root.geometry('470x640+100+100')
+root.config(bg='grey')
+root.geometry('900x640+100+100')
 root.minsize(width=470, height=640)
 config = {'font': ('Arial', '14')}
 
-expert_sys_interface = ExpertSysView(
+rules_form = RulesView(
     model=expert_sys_model,
     controller=expert_sys_controller,
     master=root,
     **config)
 
-expert_sys_interface.mainloop()
+conditions_form = ConditionView(
+    model=expert_sys_model,
+    controller=expert_sys_controller,
+    master=root,
+    **config)
+
+root.mainloop()
