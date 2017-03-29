@@ -22,23 +22,26 @@ class ExpertSysController:
     def __init__(self, model=None):
         self.model = model
 
-    def set_view(self, view):
-        self.view = view
+    def set_view(self, rule_view=None, cond_view=None):
+        if rule_view:
+            self.rule_view = rule_view
+        if cond_view:
+            self.cond_view = cond_view
 
     def add_new_rule(self):
         ''' добавление нового правила в МОДЕЛЬ '''
-        condition = self.view.conditions_var.get()
-        result = self.view.result_var.get()
-        probability = int(self.view.probability_var.get())
+        condition = self.rule_view.conditions_var.get()
+        result = self.rule_view.result_var.get()
+        probability = int(self.rule_view.probability_var.get())
         if condition and result:
             if condition not in self.model.rules:
                 self.model.add_rule(condition, result, probability)
-                self.view.conditions_var.set('')
-                self.view.result_var.set('')
-                self.view.probability_var.set(100)
-                self.view.refresh_rules()
+                self.rule_view.conditions_var.set('')
+                self.rule_view.result_var.set('')
+                self.rule_view.probability_var.set(100)
+                self.rule_view.refresh_rules()
             else:
-                self.view.ok_message('Правило "{}" уже есть в системе'.format(condition))
+                self.rule_view.ok_message('Правило "{}" уже есть в системе'.format(condition))
 
     def delete_rule(self):
         num = self.view.delete_rule_num.get()
@@ -46,7 +49,7 @@ class ExpertSysController:
             num = int(num) - 1
             condition = list(self.model.rules)[num]
             del self.model.rules[condition]
-            self.view.refresh_rules()
+            self.rule_view.refresh_rules()
 
     def add_condition(self):
         print('add_condition')
@@ -68,7 +71,7 @@ class ExpertSysController:
             else:
                 print('Ошибка! Очередная строка не соответствует шаблону.\n"{}"'.format(line))
         file.close()
-        self.view.refresh_rules()
+        self.rule_view.refresh_rules()
 
     def save_rules_to_file(self, file):
         for num, rule in enumerate(self.model.rules.items()):
@@ -94,7 +97,7 @@ class RulesView(Frame):
     def __init__(self, model=None, controller=None, master=None, **config):
         self.model = model
         self.controller = controller
-        self.controller.set_view(self)
+        self.controller.set_view(rule_view=self)
         super().__init__(master)
         self.configure(bg='black')
         self.pack(side='left', expand='yes', fill='both', padx=5, pady=5)
@@ -239,7 +242,7 @@ class ConditionView(Frame):
     def __init__(self, model=None, controller=None, master=None, **config):
         self.model = model
         self.controller = controller
-        self.controller.set_view(self)
+        self.controller.set_view(cond_view=self)
         super().__init__(master)
         self.configure(bg='black')
         self.pack(side='left', expand='yes', fill='both', padx=5, pady=5)
@@ -357,7 +360,6 @@ class ConditionView(Frame):
         frame_result_child_btn.pack(side='bottom', fill='both')
         save_result_but.pack(side='left', expand=True, fill='x')
         start_but.pack(side='right', expand=True, fill='x')
-
 
     def load_conditions(self):
         print('view - load conditions')
