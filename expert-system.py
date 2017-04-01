@@ -25,6 +25,7 @@ class ExpertSysModel:
         return len(self.conditions)
 
 
+
 class ExpertSysController:
     ''' Управления функциями МОДЕЛИ. Данные методы вызываются из ВИДА '''
     def __init__(self, model=None):
