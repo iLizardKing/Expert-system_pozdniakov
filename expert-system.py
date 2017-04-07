@@ -1,7 +1,6 @@
 from tkinter import *
 from tkinter import messagebox
 from tkinter import filedialog
-from collections import OrderedDict
 import re
 
 class Rule:
@@ -122,9 +121,12 @@ class ExpertSysController:
         self.rule_view.refresh_rules()
 
     def save_rules_to_file(self, file):
-        for num, rule in enumerate(self.model.rules.items()):
-            condition, result, probability = rule[0], rule[1][0], rule[1][1]
-            line = '{0}. ЕСЛИ {1} ТО {2} ({3}%)'.format(num+1, condition, result, probability)
+        for num, rule in enumerate(self.model.rules):
+            line = '{num}. {name} ЕСЛИ {cond} ТО {res}.'.format(
+                num=num+1,
+                name=rule.name,
+                cond=rule.condition,
+                res=rule.result)
             print(line, file=file)
         file.close()
 
@@ -303,8 +305,9 @@ class RulesView(Frame):
 
     def load_rules(self):
         filename = filedialog.askopenfilename(filetypes=[('*.rules files', '*.rules')])
-        file_var = open(filename, 'r')
-        self.controller.load_rules_from_file(file_var)
+        if filename:
+            file_var = open(filename, 'r')
+            self.controller.load_rules_from_file(file_var)
 
 
 class ConditionView(Frame):
