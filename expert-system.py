@@ -4,16 +4,27 @@ from tkinter import filedialog
 from collections import OrderedDict
 import re
 
+class Rule:
+    ''' Создан для хранения правил '''
+    def __init__(self, name, condition, result):
+        self.name = name
+        self.condition = condition
+        self.result = result
 
 class ExpertSysModel:
     ''' Хранение данных и операций по обработке данных '''
     def __init__(self):
-        self.rules = OrderedDict()
+        self.rules = list()
         self.conditions = list()
         self.result = list()
 
-    def add_rule(self, condition, result, probability):
-        self.rules[condition] = (result, probability)
+    def add_rule(self, name, condition, result):
+        self.rules.append(
+            Rule(name, condition, result)
+        )
+
+    def edit_rule(self, num, name, condition, result):
+        self.rules[num] = Rule(name, condition, result)
 
     def get_rules_amount(self):
         return len(self.rules)
@@ -29,6 +40,10 @@ class ExpertSysController:
     ''' Управления функциями МОДЕЛИ. Данные методы вызываются из ВИДА '''
     def __init__(self, model=None):
         self.model = model
+        self.rule_view = None
+        self.cond_view = None
+        self.edit_mode = False
+        self.edit_num = None
 
     def set_view(self, rule_view=None, cond_view=None):
         if rule_view:
@@ -38,26 +53,45 @@ class ExpertSysController:
 
     def add_new_rule(self):
         ''' добавление нового правила в МОДЕЛЬ '''
+        name = self.rule_view.name_var.get()
         condition = self.rule_view.conditions_var.get()
         result = self.rule_view.result_var.get()
-        probability = int(self.rule_view.probability_var.get())
-        if condition and result:
-            if condition not in self.model.rules:
-                self.model.add_rule(condition, result, probability)
+        if name and condition and result:
+            if self.edit_mode:
+                self.model.edit_rule(self.edit_num-1, name, condition, result)
+                self.edit_mode = False
+                self.rule_view.name_var.set('')
                 self.rule_view.conditions_var.set('')
                 self.rule_view.result_var.set('')
-                self.rule_view.probability_var.set(100)
+                self.rule_view.refresh_rules()
+            elif condition not in [rule.condition for rule in self.model.rules]:
+                self.model.add_rule(name, condition, result)
+                self.rule_view.name_var.set('')
+                self.rule_view.conditions_var.set('')
+                self.rule_view.result_var.set('')
                 self.rule_view.refresh_rules()
             else:
-                self.rule_view.ok_message('Правило "{}" уже есть в системе'.format(condition))
+                self.rule_view.ok_message('Правило "{}" уже есть в системе'.format(name))
 
     def del_rule(self):
-        num = self.view.delete_rule_num.get()
+        num = int(self.rule_view.select_rule_num.get())
         if num:
-            num = int(num) - 1
-            condition = list(self.model.rules)[num]
-            del self.model.rules[condition]
+            del self.model.rules[num-1]
             self.rule_view.refresh_rules()
+
+    def edit_rule(self):
+        num = int(self.rule_view.select_rule_num.get())
+        if num:
+            self.edit_mode = True
+            self.edit_num = num
+            cond = self.model.rules[num-1].condition
+            name = self.model.rules[num-1].name
+            res = self.model.rules[num-1].result
+            self.rule_view.name_var.set(name)
+            self.rule_view.conditions_var.set(cond)
+            self.rule_view.result_var.set(res)
+            self.rule_view.refresh_rules()
+
 
     def add_new_condition(self):
         ''' добавление нового состояния в МОДЕЛЬ '''
@@ -118,7 +152,7 @@ class RulesView(Frame):
         self.create_widgets(**config)
 
     def create_widgets(self, **config):
-        # delete
+        # delete|edit
         frame_delete = Frame(self)
         self.delete_but = Button(frame_delete,
                                  bd=3,
@@ -127,17 +161,25 @@ class RulesView(Frame):
                                  command=self.controller.del_rule,
                                  state='disabled',
                                  **config)
-        self.delete_rule_num = StringVar(0)
+        self.edit_but = Button(frame_delete,
+                                 bd=3,
+                                 text='Изменить',
+                                 bg='#bed6be',
+                                 command=self.controller.edit_rule,
+                                 state='disabled',
+                                 **config)
+        self.select_rule_num = StringVar(0)
         self.spinbox = Spinbox(frame_delete,
                                width=5,
                                from_=0, to=0,
-                               textvariable=self.delete_rule_num,
+                               textvariable=self.select_rule_num,
                                state='disabled',
                                **config)
-        # delete packed
+        # delete|edit packed
         frame_delete.pack(side='top', fill='x')
-        Label(frame_delete, text='Номер правила на удаление:', **config).pack(side='left')
+        Label(frame_delete, text='Номер правила:', **config).pack(side='left')
         self.delete_but.pack(side='right', padx=5, pady=5)
+        self.edit_but.pack(side='right', padx=5, pady=5)
         self.spinbox.pack(side='right', fill='y', pady=5)
 
         # text
@@ -159,6 +201,12 @@ class RulesView(Frame):
         # add
         frame_add_parent = Frame(self)
         frame_add_child = Frame(frame_add_parent)
+
+        self.name_var = StringVar()
+        name_ent = Entry(frame_add_child,
+                               textvariable=self.name_var,
+                               fg='grey',
+                               **config)
         self.conditions_var = StringVar()
         conditions_ent = Entry(frame_add_child,
                                textvariable=self.conditions_var,
@@ -169,14 +217,7 @@ class RulesView(Frame):
                            textvariable=self.result_var,
                            fg='grey',
                            **config)
-        self.probability_var = IntVar(value=100)
-        probability_scl = Scale(frame_add_child,
-                                variable=self.probability_var,
-                                orient=HORIZONTAL,
-                                from_=0, to=100,
-                                tickinterval=10,
-                                resolution=1)
-        add_rules_but = Button(frame_add_parent,
+        self.add_rules_but = Button(frame_add_parent,
                                bd=3,
                                text="Добавить",
                                bg='#bed6be',
@@ -185,13 +226,13 @@ class RulesView(Frame):
         # add packed
         frame_add_parent.pack(side='top', fill='x')
         frame_add_child.pack(side='left', expand=True, fill='x')
+        Label(frame_add_child, text="Наименование:", **config).pack(anchor=W)
+        name_ent.pack(fill='x')
         Label(frame_add_child, text="Условия:", **config).pack(anchor=W)
         conditions_ent.pack(fill='x')
         Label(frame_add_child, text="Результат:", **config).pack(anchor=W)
         result_ent.pack(fill='x')
-        Label(frame_add_child, text="Вероятность:", **config).pack(anchor=W)
-        probability_scl.pack(fill='x')
-        add_rules_but.pack(side='right', fill='both', pady=5)
+        self.add_rules_but.pack(side='right', fill='both', pady=5)
 
         # load|safe
         frame_loadsave = Frame(self)
@@ -220,26 +261,32 @@ class RulesView(Frame):
         ''' Обновляет список правил в соответствии с моделью '''
         rules_amount = self.model.get_rules_amount()
         if rules_amount > 0:
+            if self.controller.edit_mode:
+                self.add_rules_but.config(text='Редиктировать')
+            else:
+                self.add_rules_but.config(text='Добавить')
             self.spinbox.config(state='normal', from_=1, to=rules_amount)
             self.delete_but.config(state='normal')
-            self.delete_rule_num.set(1)
+            self.select_rule_num.set(1)
+            self.edit_but.config(state='normal')
             self.save_but.config(state='normal')
             self.rules_txt.config(state='normal')
             self.rules_txt.delete('1.0', END)
-            for num, rule in enumerate(self.model.rules.items()):
-                condition, result, probability = rule[0], rule[1][0], rule[1][1]
-                template = '{0}. ЕСЛИ {1} ТО {2} ({3}%)\n'
-                line = template.format(num+1,
-                                       condition,
-                                       result,
-                                       probability)
-                self.rules_txt.insert('{0}.{1}'.format(num+1, 0), line)
+
+            for num, rule in enumerate(self.model.rules):
+                template = '{num}. {name}\nЕСЛИ {condition}\nТО {result}\n\n'
+                line = template.format(num=num+1,
+                                       name=rule.name,
+                                       condition=rule.condition,
+                                       result=rule.result)
+                self.rules_txt.insert('{0}.{1}'.format(num*4+1, 0), line)
             self.rules_txt.config(state='disabled')
             self.rules_txt.see('{0}.{1}'.format(num+1, 0))
         else:
-            self.delete_rule_num.set(0)
+            self.select_rule_num.set(0)
             self.spinbox.config(from_=0, to=0, state='disabled')
             self.delete_but.config(state='disabled')
+            self.edit_but.config(state='disabled')
             self.save_but.config(state='disabled')
             self.rules_txt.config(state='normal')
             self.rules_txt.delete('1.0', END)
@@ -397,8 +444,6 @@ class ConditionView(Frame):
         print('view - save result')
         file = None
         self.controller.save_result_to_file(file)
-
-
 
 
 expert_sys_model = ExpertSysModel()
