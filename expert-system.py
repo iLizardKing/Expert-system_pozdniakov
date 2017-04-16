@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 from tkinter import *
 from tkinter import messagebox
 from tkinter import filedialog
@@ -91,7 +94,6 @@ class ExpertSysController:
             self.rule_view.result_var.set(res)
             self.rule_view.refresh_rules()
 
-
     def add_new_condition(self):
         ''' добавление нового состояния в МОДЕЛЬ '''
         condition = self.cond_view.conditions_var.get()
@@ -104,17 +106,17 @@ class ExpertSysController:
     def del_condition(self):
         print('delete_condition')
 
-    rule_re = re.compile(r'\d{1,2}\. ЕСЛИ (?P<cond>\w+) ТО (?P<res>\w+) \((?P<prob>\d{1,3})%\)')
+    rule_re = re.compile(r'\d{1,2}\) ПРАВИЛО (?P<name>\w+) ЕСЛИ (?P<cond>\w+) ТО (?P<res>\w+)\.')
 
     def load_rules_from_file(self, file):
-        self.model.rules = OrderedDict()
+        self.model.rules = []
         for line in file:
             match = __class__.rule_re.match(line)
             if match:
+                name = match.group('name')
                 condition = match.group('cond')
                 result = match.group('res')
-                probability = int(match.group('prob'))
-                self.model.add_rule(condition, result, probability)
+                self.model.add_rule(name, condition, result)
             else:
                 print('Ошибка! Очередная строка не соответствует шаблону.\n"{}"'.format(line))
         file.close()
@@ -122,7 +124,7 @@ class ExpertSysController:
 
     def save_rules_to_file(self, file):
         for num, rule in enumerate(self.model.rules):
-            line = '{num}. {name} ЕСЛИ {cond} ТО {res}.'.format(
+            line = '{num}) ПРАВИЛО {name} ЕСЛИ {cond} ТО {res}.'.format(
                 num=num+1,
                 name=rule.name,
                 cond=rule.condition,
@@ -276,7 +278,7 @@ class RulesView(Frame):
             self.rules_txt.delete('1.0', END)
 
             for num, rule in enumerate(self.model.rules):
-                template = '{num}. {name}\nЕСЛИ {condition}\nТО {result}\n\n'
+                template = '{num}) ПРАВИЛО {name}\nЕСЛИ {condition}\nТО {result}\n\n'
                 line = template.format(num=num+1,
                                        name=rule.name,
                                        condition=rule.condition,
