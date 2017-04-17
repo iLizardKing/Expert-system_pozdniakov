@@ -17,7 +17,7 @@ class ExpertSysModel:
     ''' Хранение данных и операций по обработке данных '''
     def __init__(self):
         self.rules = list()
-        self.conditions = list()
+        self.states = list()
         self.result = list()
 
     def add_rule(self, name, condition, result):
@@ -31,11 +31,11 @@ class ExpertSysModel:
     def get_rules_amount(self):
         return len(self.rules)
 
-    def add_condition(self, condition, probability):
-        self.conditions.append((condition, probability))
+    def add_state(self, state):
+        self.states.append(state)
 
-    def get_conditions_amount(self):
-        return len(self.conditions)
+    def get_states_amount(self):
+        return len(self.states)
 
 
 class ExpertSysController:
@@ -47,11 +47,11 @@ class ExpertSysController:
         self.edit_mode = False
         self.edit_num = None
 
-    def set_view(self, rule_view=None, cond_view=None):
+    def set_view(self, rule_view=None, state_view=None):
         if rule_view:
             self.rule_view = rule_view
-        if cond_view:
-            self.cond_view = cond_view
+        if state_view:
+            self.state_view = state_view
 
     def add_new_rule(self):
         ''' добавление нового правила в МОДЕЛЬ '''
@@ -94,24 +94,11 @@ class ExpertSysController:
             self.rule_view.result_var.set(res)
             self.rule_view.refresh_rules()
 
-    def add_new_condition(self):
-        ''' добавление нового состояния в МОДЕЛЬ '''
-        condition = self.cond_view.conditions_var.get()
-        probability = int(self.cond_view.probability_var.get())
-        if condition:
-            self.model.conditions.append((condition, probability))
-
-        print(self.model.conditions)
-
-    def del_condition(self):
-        print('delete_condition')
-
-    rule_re = re.compile(r'\d{1,2}\) ПРАВИЛО (?P<name>\w+) ЕСЛИ (?P<cond>\w+) ТО (?P<res>\w+)\.')
-
     def load_rules_from_file(self, file):
+        rule_re = re.compile(r'\d{1,2}\) ПРАВИЛО (?P<name>.+) ЕСЛИ (?P<cond>.+) ТО (?P<res>.+)\.')
         self.model.rules = []
         for line in file:
-            match = __class__.rule_re.match(line)
+            match = rule_re.match(line)
             if match:
                 name = match.group('name')
                 condition = match.group('cond')
@@ -132,11 +119,30 @@ class ExpertSysController:
             print(line, file=file)
         file.close()
 
-    def load_conditions_from_file(self, file):
-        print('controller - load_conditions_from_file')
+    def add_new_state(self):
+        ''' добавление нового состояния в МОДЕЛЬ '''
+        state = self.state_view.state_var.get()
+        if state:
+            if state.lower() not in self.model.states:
+                self.state_view.state_var.set('')
+                self.model.add_state(state.lower())
+                self.state_view.refresh_states()
+            else:
+                self.state_view.ok_message('Состояние "{}" уже есть в системе'.format(state))
 
-    def save_conditions_to_file(self, file):
-        print('controller - save_conditions_to_file')
+        print(self.model.states)
+
+    def del_state(self):
+        print('controller - delete_state')
+
+    def edit_state(self):
+        print('controller - edit_state')
+
+    def save_states_to_file(self, file):
+        print('controller - save_states_to_file')
+
+    def load_states_from_file(self, file):
+        print('controller - load_states_from_file')
 
     def save_result_to_file(self, file):
         print('controller - save_result_to_file')
@@ -172,19 +178,19 @@ class RulesView(Frame):
                                  command=self.controller.edit_rule,
                                  state='disabled',
                                  **config)
-        self.select_rule_num = StringVar(0)
-        self.spinbox = Spinbox(frame_delete,
-                               width=5,
-                               from_=0, to=0,
-                               textvariable=self.select_rule_num,
-                               state='disabled',
-                               **config)
+        self.select_rule_num_var = StringVar(0)
+        self.del_edit_spinbox = Spinbox(frame_delete,
+                                        width=5,
+                                        from_=0, to=0,
+                                        textvariable=self.select_rule_num_var,
+                                        state='disabled',
+                                        **config)
         # delete|edit packed
         frame_delete.pack(side='top', fill='x')
         Label(frame_delete, text='Номер правила:', **config).pack(side='left')
         self.delete_but.pack(side='right', padx=5, pady=5)
         self.edit_but.pack(side='right', padx=5, pady=5)
-        self.spinbox.pack(side='right', fill='y', pady=5)
+        self.del_edit_spinbox.pack(side='right', fill='y', pady=5)
 
         # text
         frame_text = Frame(self)
@@ -269,16 +275,16 @@ class RulesView(Frame):
                 self.add_rules_but.config(text='Редиктировать')
             else:
                 self.add_rules_but.config(text='Добавить')
-            self.spinbox.config(state='normal', from_=1, to=rules_amount)
+            self.del_edit_spinbox.config(state='normal', from_=1, to=rules_amount)
             self.delete_but.config(state='normal')
-            self.select_rule_num.set(1)
+            self.select_rule_num_var.set(1)
             self.edit_but.config(state='normal')
             self.save_but.config(state='normal')
             self.rules_txt.config(state='normal')
             self.rules_txt.delete('1.0', END)
 
+            template = '{num}) ПРАВИЛО {name}\nЕСЛИ {condition}\nТО {result}\n\n'
             for num, rule in enumerate(self.model.rules):
-                template = '{num}) ПРАВИЛО {name}\nЕСЛИ {condition}\nТО {result}\n\n'
                 line = template.format(num=num+1,
                                        name=rule.name,
                                        condition=rule.condition,
@@ -287,8 +293,8 @@ class RulesView(Frame):
             self.rules_txt.config(state='disabled')
             self.rules_txt.see('{0}.{1}'.format(num+1, 0))
         else:
-            self.select_rule_num.set(0)
-            self.spinbox.config(from_=0, to=0, state='disabled')
+            self.select_rule_num_var.set(0)
+            self.del_edit_spinbox.config(from_=0, to=0, state='disabled')
             self.delete_but.config(state='disabled')
             self.edit_but.config(state='disabled')
             self.save_but.config(state='disabled')
@@ -312,96 +318,98 @@ class RulesView(Frame):
             self.controller.load_rules_from_file(file_var)
 
 
-class ConditionView(Frame):
+class StatesView(Frame):
     def __init__(self, model=None, controller=None, master=None, **config):
         self.model = model
         self.controller = controller
-        self.controller.set_view(cond_view=self)
+        self.controller.set_view(state_view=self)
         super().__init__(master)
         self.configure(bg='black')
         self.pack(side='left', expand='yes', fill='both', padx=5, pady=5)
-        self.create_widgets(**config)
+        self.create_state_widgets(**config)
+        self.create_result_widgets(**config)
 
-    def create_widgets(self, **config):
-        # add conditions with entry, scroll & button
+    def create_state_widgets(self, **config):
+        # add states with entry, scroll & button
         frame_add_parent = Frame(self)
         frame_add_child = Frame(frame_add_parent)
-        self.conditions_var = StringVar()
-        conditions_ent = Entry(frame_add_child,
-                               textvariable=self.conditions_var,
+        self.state_var = StringVar()
+        state_ent = Entry(frame_add_child,
+                               textvariable=self.state_var,
                                fg='grey',
                                **config)
-        self.probability_var = IntVar(value=100)
-        probability_scl = Scale(frame_add_child,
-                                variable=self.probability_var,
-                                orient=HORIZONTAL,
-                                from_=0, to=100,
-                                tickinterval=10,
-                                resolution=1)
-        conditions_add_but = Button(frame_add_parent,
-                                    width=9, bd=3,
-                                    text='Добавить',
-                                    bg='#bed6be',
-                                    command=self.controller.add_new_condition,
-                                    **config)
-        # PACKED add conditions with entry, scroll & button
+        state_add_but = Button(frame_add_parent,
+                               width=9, bd=3,
+                               text='Добавить',
+                               bg='#bed6be',
+                               command=self.controller.add_new_state,
+                               **config)
+        # PACKED add states with entry, scroll & button
         frame_add_parent.pack(side='top', fill='x')
         frame_add_child.pack(side='left', expand=True, fill='x')
-        Label(frame_add_child, text="Состояние и степень:", **config).pack(anchor=W)
-        conditions_ent.pack(fill='x')
-        probability_scl.pack(fill='x')
-        conditions_add_but.pack(side='right', fill='both', pady=5)
+        Label(frame_add_child, text="Состояние:", **config).pack(anchor=W)
+        state_ent.pack(fill='x')
+        state_add_but.pack(side='right', fill='both', pady=5)
 
-        # conditions text with opportunity to delete (spinbox & button),
+        # state text with opportunity to delete and edit (spinbox & 2 buttons),
         # save & load buttons
         frame_text_parent = Frame(self)
         frame_text_child = Frame(frame_text_parent)
-        self.conditions_txt = Text(frame_text_child,
-                                   width=25,
-                                   height=12,
-                                   wrap='word',
-                                   state='disabled',
-                                   **config)
-        conditions_scrollbar = Scrollbar(frame_text_child,
-                                         command=self.conditions_txt.yview)
-        self.conditions_txt.config(yscrollcommand=conditions_scrollbar.set)
-        self.del_conditions_num_var = StringVar(0)
-        self.del_conditions_num_spin = Spinbox(frame_text_parent,
-                                      width=5,
-                                      from_=0, to=0,
-                                      textvariable=self.del_conditions_num_var,
+        self.states_txt = Text(frame_text_child,
+                               width=25,
+                               height=12,
+                               wrap='word',
+                               state='disabled',
+                               **config)
+        states_scrollbar = Scrollbar(frame_text_child,
+                                     command=self.states_txt.yview)
+        self.states_txt.config(yscrollcommand=states_scrollbar.set)
+        self.select_state_num_var = StringVar(0)
+        self.del_edit_states_spinbox = Spinbox(frame_text_parent,
+                                               width=5,
+                                               from_=0, to=0,
+                                               textvariable=self.select_state_num_var,
+                                               state='disabled',
+                                               **config)
+        self.states_del_but = Button(frame_text_parent,
+                                     width=9,
+                                     text='Удалить',
+                                     bg='#eebebe',
+                                     state='disabled',
+                                     command=self.controller.del_state,
+                                     **config)
+        self.states_edit_but = Button(frame_text_parent,
+                                      width=9,
+                                      text='Изменить',
+                                      bg='#bed6be',
                                       state='disabled',
+                                      command=self.controller.edit_state,
                                       **config)
-        self.conditions_del_but = Button(frame_text_parent,
-                                            width=9,
-                                            text='Удалить',
-                                            bg='#eebebe',
-                                            state='disabled',
-                                            command=self.controller.del_condition,
-                                            **config)
-        save_conditions_but = Button(frame_text_parent,
-                                     width=9, bd=3,
-                                     text='Сохранить\nсостояние',
-                                     bg='#bebeee',
-                                     command=self.save_conditions,
-                                     **config)
-        load_conditions_but = Button(frame_text_parent,
-                                     width=9, bd=3,
-                                     text='Загрузить\nсостояние',
-                                     bg='#bebeee',
-                                     command=self.load_conditions,
-                                     **config)
+        save_states_but = Button(frame_text_parent,
+                                 width=9, bd=3,
+                                 text='Сохранить\nсостояние',
+                                 bg='#bebeee',
+                                 command=self.save_states,
+                                 **config)
+        load_states_but = Button(frame_text_parent,
+                                 width=9, bd=3,
+                                 text='Загрузить\nсостояние',
+                                 bg='#bebeee',
+                                 command=self.load_states,
+                                 **config)
         # PACKED conditions text with opportunity to delete (spinbox & button),
         # save & load buttons
         frame_text_parent.pack(side='top', expand=True, fill='both')
         frame_text_child.pack(side='left', expand=True, fill='both')
-        self.conditions_txt.pack(side='left', expand=True, fill='both', pady=5)
-        conditions_scrollbar.pack(side='left', fill='y', pady=5)
-        self.del_conditions_num_spin.pack(side='top',fill='x', pady=5)
-        self.conditions_del_but.pack(side='top', fill='x', pady=5)
-        save_conditions_but.pack(side='top', fill='x', expand=True, anchor='s')
-        load_conditions_but.pack(side='bottom', fill='x', pady=5)
+        self.states_txt.pack(side='left', expand=True, fill='both', pady=5)
+        states_scrollbar.pack(side='left', fill='y', pady=5)
+        self.del_edit_states_spinbox.pack(side='top',fill='x', pady=5)
+        self.states_del_but.pack(side='top', fill='x', pady=5)
+        self.states_edit_but.pack(side='top', fill='x', pady=5)
+        save_states_but.pack(side='top', fill='x', expand=True, anchor='s')
+        load_states_but.pack(side='bottom', fill='x', pady=5)
 
+    def create_result_widgets(self, **config):
         # result text, start button, save result button
         frame_result_parent = Frame(self, bg='#ffffd0')
         frame_result_child_txt = Frame(frame_result_parent)
@@ -435,15 +443,41 @@ class ConditionView(Frame):
         save_result_but.pack(side='left', expand=True, fill='x')
         start_but.pack(side='right', expand=True, fill='x')
 
-    def load_conditions(self):
-        print('view - load conditions')
-        file = None
-        self.controller.load_conditions_from_file(file)
+    def ok_message(self, message):
+        messagebox.showinfo('Ошибка', message)
 
-    def save_conditions(self):
-        print('view - save conditions')
+    def refresh_states(self):
+        ''' Обновляет список состояний в соответствии с моделью '''
+        states_amount = self.model.get_states_amount()
+        if states_amount > 0:
+            self.del_edit_states_spinbox.config(state='normal', from_=1, to=states_amount)
+            self.select_state_num_var.set(1)
+            self.states_del_but.config(state='normal')
+            self.states_edit_but.config(state='normal')
+            self.states_txt.config(state='normal')
+            self.states_txt.delete('1.0', END)
+            for num, state in enumerate(self.model.states):
+                line = '{num}) {state}\n'.format(num=num, state=state)
+                self.states_txt.insert('{0}.{1}'.format(num+1, 0), line)
+            self.states_txt.config(state='disable')
+            self.states_txt.see('{0}.{1}'.format(num+1, 0))
+        else:
+            self.del_edit_states_spinbox.config(state='disable', from_=0, to=0)
+            self.states_del_but.config(state='normal')
+            self.states_edit_but.config(state='normal')
+            self.states_txt.config(state='normal')
+            self.states_txt.delete('1.0', END)
+            self.states_txt.config(state='disable')
+
+    def save_states(self):
+        print('view - save states')
         file = None
-        self.controller.save_conditions_to_file(file)
+        self.controller.save_states_to_file(file)
+
+    def load_states(self):
+        print('view - load states')
+        file = None
+        self.controller.load_states_from_file(file)
 
     def save_result(self):
         print('view - save result')
@@ -467,7 +501,7 @@ rules_form = RulesView(
     master=root,
     **config)
 
-conditions_form = ConditionView(
+states_form = StatesView(
     model=expert_sys_model,
     controller=expert_sys_controller,
     master=root,
