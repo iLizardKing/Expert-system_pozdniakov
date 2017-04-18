@@ -18,7 +18,7 @@ class ExpertSysModel:
     def __init__(self):
         self.rules = list()
         self.states = list()
-        self.result = list()
+        self.results = dict()
 
     def add_rule(self, name, condition, result):
         self.rules.append(
@@ -40,6 +40,11 @@ class ExpertSysModel:
     def get_states_amount(self):
         return len(self.states)
 
+    def add_result(self, rule_name, conclusions):
+        self.results[rule_name] = conclusions
+
+    def get_results_amount(self):
+        return len(self.results)
 
 class ExpertSysController:
     ''' Управления функциями МОДЕЛИ. Данные методы вызываются из ВИДА '''
@@ -141,8 +146,6 @@ class ExpertSysController:
                 self.state_view.ok_message('Состояние "{}" уже есть в системе'.format(state))
                 self.state_view.state_var.set('')
 
-        print(self.model.states)
-
     def del_state(self):
         num = int(self.state_view.select_state_num_var.get())
         if num:
@@ -194,7 +197,7 @@ class RulesView(Frame):
         self.edit_but = Button(frame_delete,
                                  bd=3,
                                  text='Изменить',
-                                 bg='#bed6be',
+                                 bg='#bebeee',
                                  command=self.controller.edit_rule,
                                  state='disabled',
                                  **config)
@@ -207,25 +210,27 @@ class RulesView(Frame):
                                         **config)
         # delete|edit packed
         frame_delete.pack(side='top', fill='x')
-        Label(frame_delete, text='Номер правила:', **config).pack(side='left')
+        Label(frame_delete, text='Номер правила:', **config).pack(side='left', padx=5)
         self.delete_but.pack(side='right', padx=5, pady=5)
         self.edit_but.pack(side='right', padx=5, pady=5)
         self.del_edit_spinbox.pack(side='right', fill='y', pady=5)
 
-        # text
-        frame_text = Frame(self)
-        self.rules_txt = Text(frame_text,
+        # rules in text widget
+        frame_text_parent = Frame(self)
+        frame_text_child = Frame(frame_text_parent)
+        self.rules_txt = Text(frame_text_child,
                               width=40,
                               height=15,
                               wrap='word',
                               state='disabled',
                               **config)
-        scrollbar = Scrollbar(frame_text,
+        scrollbar = Scrollbar(frame_text_child,
                               command=self.rules_txt.yview)
         self.rules_txt.config(yscrollcommand=scrollbar.set)
         # text packed
-        frame_text.pack(side='top', expand=True, fill='both')
-        self.rules_txt.pack(side='left', expand=True, fill='both')
+        frame_text_parent.pack(side='top', fill='both', expand=True)
+        frame_text_child.pack(padx=5, fill='both', expand=True)
+        self.rules_txt.pack(side='left', fill='both', expand=True)
         scrollbar.pack(side='left', fill='y')
 
         # add
@@ -255,54 +260,55 @@ class RulesView(Frame):
                                **config)
         # add packed
         frame_add_parent.pack(side='top', fill='x')
-        frame_add_child.pack(side='left', expand=True, fill='x')
-        Label(frame_add_child, text="Наименование:", **config).pack(anchor=W)
+        frame_add_child.pack(side='left', fill='x', expand=True, padx=5)
+        Label(frame_add_child, text="Наименование:", **config).pack(anchor=W,)
         name_ent.pack(fill='x')
         Label(frame_add_child, text="Условия:", **config).pack(anchor=W)
         conditions_ent.pack(fill='x')
         Label(frame_add_child, text="Результат:", **config).pack(anchor=W)
         result_ent.pack(fill='x')
-        self.add_rules_but.pack(side='right', fill='both', pady=5)
+        self.add_rules_but.pack(side='right', fill='both', padx=5, pady=5)
 
         # load|safe
         frame_loadsave = Frame(self)
         load_but = Button(frame_loadsave,
                           bd=3,
-                          text='Загрузить правила',
-                          bg='#bebeee',
+                          text='Загрузить',
+                          bg='#ffddaa',
                           command=self.load_rules,
                           **config)
         self.save_but = Button(frame_loadsave,
                           bd=3,
-                          text='Сохранить правила',
-                          bg='#bebeee',
+                          text='Сохранить',
+                          bg='#ffddaa',
                           state='disabled',
                           command=self.save_rules,
                           **config)
         # load|safe packed
         frame_loadsave.pack(side='top', fill='x')
-        load_but.pack(side='left', expand=True, fill='x')
-        self.save_but.pack(side='right', expand=True, fill='x')
+        load_but.pack(side='left', fill='x', expand=True,  padx=5, pady=5)
+        self.save_but.pack(side='right', fill='x', expand=True, padx=5, pady=5)
 
     def ok_message(self, message):
         messagebox.showinfo('Ошибка', message)
 
     def refresh_rules(self):
         ''' Обновляет список правил в соответствии с моделью '''
-        rules_amount = self.model.get_rules_amount()
-        if rules_amount > 0:
+        on_off_widgets = [self.del_edit_spinbox,
+                          self.delete_but,
+                          self.edit_but,
+                          self.save_but]
+        if self.model.get_rules_amount() > 0:
+            for widget in on_off_widgets:
+                widget.config(state='normal')
             if self.controller.rule_edit_mode:
                 self.add_rules_but.config(text='Редиктировать')
             else:
                 self.add_rules_but.config(text='Добавить')
-            self.del_edit_spinbox.config(state='normal', from_=1, to=rules_amount)
-            self.delete_but.config(state='normal')
+            self.del_edit_spinbox.config(from_=1, to=self.model.get_rules_amount())
             self.select_rule_num_var.set(1)
-            self.edit_but.config(state='normal')
-            self.save_but.config(state='normal')
             self.rules_txt.config(state='normal')
             self.rules_txt.delete('1.0', END)
-
             template = '{num}) ПРАВИЛО {name}\nЕСЛИ {condition}\nТО {result}\n\n'
             for num, rule in enumerate(self.model.rules):
                 line = template.format(num=num+1,
@@ -312,12 +318,13 @@ class RulesView(Frame):
                 self.rules_txt.insert('{0}.{1}'.format(num*4+1, 0), line)
             self.rules_txt.config(state='disabled')
             self.rules_txt.see('{0}.{1}'.format(num+1, 0))
+            if self.model.get_states_amount() > 0:
+                self.controller.state_view.start_but.config(state='normal')
         else:
+            for widget in on_off_widgets + [self.controller.state_view.start_but]:
+                widget.config(state='disabled')
             self.select_rule_num_var.set(0)
-            self.del_edit_spinbox.config(from_=0, to=0, state='disabled')
-            self.delete_but.config(state='disabled')
-            self.edit_but.config(state='disabled')
-            self.save_but.config(state='disabled')
+            self.del_edit_spinbox.config(from_=0, to=0)
             self.rules_txt.config(state='normal')
             self.rules_txt.delete('1.0', END)
             self.rules_txt.config(state='disabled')
@@ -350,7 +357,7 @@ class StatesView(Frame):
         self.create_result_widgets(**config)
 
     def create_state_widgets(self, **config):
-        # add states with entry, scroll & button
+        # add states with entry & button
         frame_add_parent = Frame(self)
         frame_add_child = Frame(frame_add_parent)
         self.state_var = StringVar()
@@ -366,72 +373,72 @@ class StatesView(Frame):
                                **config)
         # PACKED add states with entry, scroll & button
         frame_add_parent.pack(side='top', fill='x')
-        frame_add_child.pack(side='left', expand=True, fill='x')
+        frame_add_child.pack(side='left', expand=True, fill='x', pady=5, padx=5)
         Label(frame_add_child, text="Состояние:", **config).pack(anchor=W)
         state_ent.pack(fill='x')
-        self.state_add_but.pack(side='right', fill='both', pady=5)
+        self.state_add_but.pack(side='right', fill='both', pady=5, padx=5)
 
         # state text with opportunity to delete and edit (spinbox & 2 buttons),
         # save & load buttons
-        frame_text_parent = Frame(self)
-        frame_text_child = Frame(frame_text_parent)
-        self.states_txt = Text(frame_text_child,
-                               width=25,
+        frame_state_parent = Frame(self)
+        frame_state_child = Frame(frame_state_parent)
+        self.states_txt = Text(frame_state_child,
+                               width=20,
                                height=12,
                                wrap='word',
                                state='disabled',
                                **config)
-        states_scrollbar = Scrollbar(frame_text_child,
-                                     command=self.states_txt.yview)
+        states_scrollbar = Scrollbar(frame_state_child, command=self.states_txt.yview)
         self.states_txt.config(yscrollcommand=states_scrollbar.set)
         self.select_state_num_var = StringVar(0)
-        self.del_edit_states_spinbox = Spinbox(frame_text_parent,
+        self.del_edit_states_spinbox = Spinbox(frame_state_parent,
                                                width=5,
                                                from_=0, to=0,
                                                textvariable=self.select_state_num_var,
                                                state='disabled',
                                                **config)
-        self.states_del_but = Button(frame_text_parent,
+        self.states_del_but = Button(frame_state_parent,
                                      width=9,
                                      text='Удалить',
                                      bg='#eebebe',
                                      state='disabled',
                                      command=self.controller.del_state,
                                      **config)
-        self.states_edit_but = Button(frame_text_parent,
+        self.states_edit_but = Button(frame_state_parent,
                                       width=9,
                                       text='Изменить',
-                                      bg='#bed6be',
+                                      bg='#bebeee',
                                       state='disabled',
                                       command=self.controller.edit_state,
                                       **config)
-        save_states_but = Button(frame_text_parent,
+        self.save_states_but = Button(frame_state_parent,
+                                      width=9, bd=3,
+                                      text='Сохранить',
+                                      bg='#ffddaa',
+                                      state='disabled',
+                                      command=self.save_states,
+                                      **config)
+        load_states_but = Button(frame_state_parent,
                                  width=9, bd=3,
-                                 text='Сохранить\nсостояние',
-                                 bg='#bebeee',
-                                 command=self.save_states,
-                                 **config)
-        load_states_but = Button(frame_text_parent,
-                                 width=9, bd=3,
-                                 text='Загрузить\nсостояние',
-                                 bg='#bebeee',
+                                 text='Загрузить',
+                                 bg='#ffddaa',
                                  command=self.load_states,
                                  **config)
         # PACKED conditions text with opportunity to delete (spinbox & button),
         # save & load buttons
-        frame_text_parent.pack(side='top', expand=True, fill='both')
-        frame_text_child.pack(side='left', expand=True, fill='both')
+        frame_state_parent.pack(side='top', fill='x', anchor=N)
+        frame_state_child.pack(side='left', expand=True, fill='both', pady=5, padx=5)
         self.states_txt.pack(side='left', expand=True, fill='both', pady=5)
         states_scrollbar.pack(side='left', fill='y', pady=5)
-        self.del_edit_states_spinbox.pack(side='top',fill='x', pady=5)
-        self.states_del_but.pack(side='top', fill='x', pady=5)
-        self.states_edit_but.pack(side='top', fill='x', pady=5)
-        save_states_but.pack(side='top', fill='x', expand=True, anchor='s')
-        load_states_but.pack(side='bottom', fill='x', pady=5)
+        self.del_edit_states_spinbox.pack(side='top',fill='x', pady=5, padx=5)
+        self.states_del_but.pack(side='top', fill='x', pady=5, padx=5)
+        self.states_edit_but.pack(side='top', fill='x', pady=5, padx=5)
+        self.save_states_but.pack(side='top', fill='x', expand=True, anchor='s', pady=5, padx=5)
+        load_states_but.pack(side='bottom', fill='x', pady=5, padx=5)
 
     def create_result_widgets(self, **config):
         # result text, start button, save result button
-        frame_result_parent = Frame(self, bg='#ffffd0')
+        frame_result_parent = Frame(self)
         frame_result_child_txt = Frame(frame_result_parent)
         frame_result_child_btn = Frame(frame_result_parent)
         self.result_txt = Text(frame_result_child_txt,
@@ -440,44 +447,56 @@ class StatesView(Frame):
                                state='disabled',
                                wrap='word',
                                **config)
-        result_scrollbar = Scrollbar(frame_result_child_txt,
-                              command=self.result_txt.yview)
+        result_scrollbar = Scrollbar(frame_result_child_txt, command=self.result_txt.yview)
         self.result_txt.config(yscrollcommand=result_scrollbar.set)
-        start_but = Button(frame_result_child_btn,
-                           bd=3,
-                           text='Начать обработку',
-                           command=self.controller.start_processing,
-                           **config)
-        save_result_but = Button(frame_result_child_btn,
-                                 bd=3,
-                                 text='Сохранить результат',
-                                 bg='#bebeee',
-                                 command=self.save_result,
-                                 **config)
+        self.start_but = Button(frame_result_child_btn,
+                                bd=3,
+                                text='РЕШИТЬ',
+                                bg='black',
+                                fg='white',
+                                state='disable',
+                                command=self.controller.start_processing,
+                                **config)
+        self.save_result_but = Button(frame_result_child_btn,
+                                      bd=3,
+                                      text='Сохранить',
+                                      bg='#ffddaa',
+                                      state='disable',
+                                      command=self.save_result,
+                                      **config)
+        self.clear_result_but = Button(frame_result_child_btn,
+                                       bd=3,
+                                       text='Очистить',
+                                       bg='#eebebe',
+                                       state='disable',
+                                       command=self.save_result,
+                                       **config)
         # PACKED result text, start button, save result button
-        frame_result_parent.pack(side='bottom', fill='x')
-        frame_result_child_txt.pack(side='top', expand=True, fill='x')
-        self.result_txt.pack(side='left', expand=True, fill='x')
+        Label(frame_result_parent, text='Результаты:', **config).pack(side='top', padx=5, anchor=W)
+        frame_result_parent.pack(side='top', fill='both', expand=True)
+        frame_result_child_txt.pack(side='top', fill='both', expand=True, padx=5)
+        self.result_txt.pack(side='left', fill='both', expand=True)
         result_scrollbar.pack(side='left', fill='y')
         frame_result_child_btn.pack(side='bottom', fill='both')
-        save_result_but.pack(side='left', expand=True, fill='x')
-        start_but.pack(side='right', expand=True, fill='x')
+        self.save_result_but.pack(side='left', expand=True, fill='x', pady=5, padx=5)
+        self.clear_result_but.pack(side='left', expand=True, fill='x', pady=5, padx=5)
+        self.start_but.pack(side='right', expand=True, fill='x', pady=5, padx=5)
 
     def ok_message(self, message):
         messagebox.showinfo('Ошибка', message)
 
     def refresh_states(self):
         ''' Обновляет список состояний в соответствии с моделью '''
-        states_amount = self.model.get_states_amount()
-        if states_amount > 0:
-            if self.controller.state_edit_mode:
-                self.state_add_but.config(text='Редиктировать')
-            else:
-                self.state_add_but.config(text='Добавить')
-            self.del_edit_states_spinbox.config(state='normal', from_=1, to=states_amount)
+        on_off_widgets = [self.del_edit_states_spinbox,
+                          self.states_del_but,
+                          self.states_edit_but,
+                          self.save_states_but]
+        if self.model.get_states_amount() > 0:
+            for widget in on_off_widgets:
+                widget.config(state='normal')
+            self.state_add_but.config(text='Редактир' if self.controller.state_edit_mode else 'Добавить')
+            self.del_edit_states_spinbox.config(from_=1, to=self.model.get_states_amount())
             self.select_state_num_var.set(1)
-            self.states_del_but.config(state='normal')
-            self.states_edit_but.config(state='normal')
             self.states_txt.config(state='normal')
             self.states_txt.delete('1.0', END)
             for num, state in enumerate(self.model.states):
@@ -485,14 +504,20 @@ class StatesView(Frame):
                 self.states_txt.insert('{0}.{1}'.format(num+1, 0), line)
             self.states_txt.config(state='disable')
             self.states_txt.see('{0}.{1}'.format(num+1, 0))
+            if self.model.get_rules_amount() > 0:
+                self.start_but.config(state='normal')
         else:
+            for widget in on_off_widgets + [self.start_but]:
+                widget.config(state='disable')
             self.select_state_num_var.set(0)
-            self.del_edit_states_spinbox.config(state='disable', from_=0, to=0)
-            self.states_del_but.config(state='normal')
-            self.states_edit_but.config(state='normal')
+            self.del_edit_states_spinbox.config(from_=0, to=0)
             self.states_txt.config(state='normal')
             self.states_txt.delete('1.0', END)
             self.states_txt.config(state='disable')
+        if self.model.get_results_amount() > 0:
+            self.save_result_but.config(state='normal')
+        else:
+            self.save_result_but.config(state='disable')
 
     def save_states(self):
         print('view - save states')
@@ -516,8 +541,8 @@ expert_sys_controller = ExpertSysController(expert_sys_model)
 root = Tk()
 root.title('Экспертная система')
 root.config(bg='grey')
-root.geometry('889x632+100+100')
-root.minsize(width=472, height=632)
+root.geometry('880x625+100+100')
+root.minsize(width=481, height=625)
 config = {'font': ('Arial', '14')}
 
 rules_form = RulesView(
