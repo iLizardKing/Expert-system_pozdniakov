@@ -34,6 +34,9 @@ class ExpertSysModel:
     def add_state(self, state):
         self.states.append(state)
 
+    def edit_state(self, num, state):
+        self.states[num] = state
+
     def get_states_amount(self):
         return len(self.states)
 
@@ -61,7 +64,7 @@ class ExpertSysController:
         result = self.rule_view.result_var.get()
         if name and condition and result:
             if self.rule_edit_mode:
-                self.model.edit_rule(self.edit_num-1, name, condition, result)
+                self.model.edit_rule(self.rule_edit_num-1, name, condition, result)
                 self.rule_edit_mode = False
                 self.rule_view.name_var.set('')
                 self.rule_view.conditions_var.set('')
@@ -74,7 +77,8 @@ class ExpertSysController:
                 self.rule_view.result_var.set('')
                 self.rule_view.refresh_rules()
             else:
-                self.rule_view.ok_message('Правило "{}" уже есть в системе'.format(name))
+                mes = 'Правило c данными условиями уже есть в системе.\nНазвание: {}'
+                self.rule_view.ok_message(mes.format(name))
 
     def del_rule(self):
         num = int(self.rule_view.select_rule_num_var.get())
@@ -83,7 +87,7 @@ class ExpertSysController:
             self.rule_view.refresh_rules()
 
     def edit_rule(self):
-        num = int(self.rule_view.select_rule_num.get())
+        num = int(self.rule_view.select_rule_num_var.get())
         if num:
             self.rule_edit_mode = True
             self.rule_edit_num = num
@@ -124,12 +128,18 @@ class ExpertSysController:
         ''' добавление нового состояния в МОДЕЛЬ '''
         state = self.state_view.state_var.get()
         if state:
-            if state.lower() not in self.model.states:
+            if self.state_edit_mode:
+                self.model.edit_state(self.state_edit_num-1, state)
+                self.state_edit_mode = False
+                self.state_view.state_var.set('')
+                self.state_view.refresh_states()
+            elif state.lower() not in self.model.states:
                 self.state_view.state_var.set('')
                 self.model.add_state(state.lower())
                 self.state_view.refresh_states()
             else:
                 self.state_view.ok_message('Состояние "{}" уже есть в системе'.format(state))
+                self.state_view.state_var.set('')
 
         print(self.model.states)
 
@@ -348,7 +358,7 @@ class StatesView(Frame):
                                textvariable=self.state_var,
                                fg='grey',
                                **config)
-        state_add_but = Button(frame_add_parent,
+        self.state_add_but = Button(frame_add_parent,
                                width=9, bd=3,
                                text='Добавить',
                                bg='#bed6be',
@@ -359,7 +369,7 @@ class StatesView(Frame):
         frame_add_child.pack(side='left', expand=True, fill='x')
         Label(frame_add_child, text="Состояние:", **config).pack(anchor=W)
         state_ent.pack(fill='x')
-        state_add_but.pack(side='right', fill='both', pady=5)
+        self.state_add_but.pack(side='right', fill='both', pady=5)
 
         # state text with opportunity to delete and edit (spinbox & 2 buttons),
         # save & load buttons
@@ -460,6 +470,10 @@ class StatesView(Frame):
         ''' Обновляет список состояний в соответствии с моделью '''
         states_amount = self.model.get_states_amount()
         if states_amount > 0:
+            if self.controller.state_edit_mode:
+                self.state_add_but.config(text='Редиктировать')
+            else:
+                self.state_add_but.config(text='Добавить')
             self.del_edit_states_spinbox.config(state='normal', from_=1, to=states_amount)
             self.select_state_num_var.set(1)
             self.states_del_but.config(state='normal')
