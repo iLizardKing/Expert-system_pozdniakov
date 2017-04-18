@@ -44,7 +44,8 @@ class ExpertSysController:
         self.model = model
         self.rule_view = None
         self.cond_view = None
-        self.edit_mode = False
+        self.rule_edit_mode = False
+        self.state_edit_mode = False
         self.edit_num = None
 
     def set_view(self, rule_view=None, state_view=None):
@@ -59,9 +60,9 @@ class ExpertSysController:
         condition = self.rule_view.conditions_var.get()
         result = self.rule_view.result_var.get()
         if name and condition and result:
-            if self.edit_mode:
+            if self.rule_edit_mode:
                 self.model.edit_rule(self.edit_num-1, name, condition, result)
-                self.edit_mode = False
+                self.rule_edit_mode = False
                 self.rule_view.name_var.set('')
                 self.rule_view.conditions_var.set('')
                 self.rule_view.result_var.set('')
@@ -76,7 +77,7 @@ class ExpertSysController:
                 self.rule_view.ok_message('Правило "{}" уже есть в системе'.format(name))
 
     def del_rule(self):
-        num = int(self.rule_view.select_rule_num.get())
+        num = int(self.rule_view.select_rule_num_var.get())
         if num:
             del self.model.rules[num-1]
             self.rule_view.refresh_rules()
@@ -84,8 +85,8 @@ class ExpertSysController:
     def edit_rule(self):
         num = int(self.rule_view.select_rule_num.get())
         if num:
-            self.edit_mode = True
-            self.edit_num = num
+            self.rule_edit_mode = True
+            self.rule_edit_num = num
             cond = self.model.rules[num-1].condition
             name = self.model.rules[num-1].name
             res = self.model.rules[num-1].result
@@ -133,10 +134,19 @@ class ExpertSysController:
         print(self.model.states)
 
     def del_state(self):
-        print('controller - delete_state')
+        num = int(self.state_view.select_state_num_var.get())
+        if num:
+            del self.model.states[num-1]
+            self.state_view.refresh_states()
 
     def edit_state(self):
-        print('controller - edit_state')
+        num = int(self.state_view.select_state_num_var.get())
+        if num:
+            self.state_edit_mode = True
+            self.state_edit_num = num
+            state = self.model.states[num - 1]
+            self.state_view.state_var.set(state)
+            self.state_view.refresh_states()
 
     def save_states_to_file(self, file):
         print('controller - save_states_to_file')
@@ -271,7 +281,7 @@ class RulesView(Frame):
         ''' Обновляет список правил в соответствии с моделью '''
         rules_amount = self.model.get_rules_amount()
         if rules_amount > 0:
-            if self.controller.edit_mode:
+            if self.controller.rule_edit_mode:
                 self.add_rules_but.config(text='Редиктировать')
             else:
                 self.add_rules_but.config(text='Добавить')
@@ -457,11 +467,12 @@ class StatesView(Frame):
             self.states_txt.config(state='normal')
             self.states_txt.delete('1.0', END)
             for num, state in enumerate(self.model.states):
-                line = '{num}) {state}\n'.format(num=num, state=state)
+                line = '{num}) {state}\n'.format(num=num+1, state=state)
                 self.states_txt.insert('{0}.{1}'.format(num+1, 0), line)
             self.states_txt.config(state='disable')
             self.states_txt.see('{0}.{1}'.format(num+1, 0))
         else:
+            self.select_state_num_var.set(0)
             self.del_edit_states_spinbox.config(state='disable', from_=0, to=0)
             self.states_del_but.config(state='normal')
             self.states_edit_but.config(state='normal')
