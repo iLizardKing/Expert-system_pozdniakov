@@ -104,6 +104,16 @@ class ExpertSysController:
             self.rule_view.result_var.set(res)
             self.rule_view.refresh_rules()
 
+    def save_rules_to_file(self, file):
+        for num, rule in enumerate(self.model.rules):
+            line = '{num}) ПРАВИЛО {name} ЕСЛИ {cond} ТО {res}.'.format(
+                num=num+1,
+                name=rule.name,
+                cond=rule.condition,
+                res=rule.result)
+            print(line, file=file)
+        file.close()
+
     def load_rules_from_file(self, file):
         rule_re = re.compile(r'\d{1,2}\) ПРАВИЛО (?P<name>.+) ЕСЛИ (?P<cond>.+) ТО (?P<res>.+)\.')
         self.model.rules = []
@@ -118,16 +128,6 @@ class ExpertSysController:
                 print('Ошибка! Очередная строка не соответствует шаблону.\n"{}"'.format(line))
         file.close()
         self.rule_view.refresh_rules()
-
-    def save_rules_to_file(self, file):
-        for num, rule in enumerate(self.model.rules):
-            line = '{num}) ПРАВИЛО {name} ЕСЛИ {cond} ТО {res}.'.format(
-                num=num+1,
-                name=rule.name,
-                cond=rule.condition,
-                res=rule.result)
-            print(line, file=file)
-        file.close()
 
     def add_new_state(self):
         ''' добавление нового состояния в МОДЕЛЬ '''
@@ -162,16 +162,58 @@ class ExpertSysController:
             self.state_view.refresh_states()
 
     def save_states_to_file(self, file):
-        print('controller - save_states_to_file')
+        for num, state in enumerate(self.model.states):
+            line = '{0}) {1}.'.format(num+1, state)
+            print(line, file=file)
+        file.close()
 
     def load_states_from_file(self, file):
-        print('controller - load_states_from_file')
+        state_re = re.compile(r'\d{1,2}\) (?P<state>.+)\.')
+        self.model.states = []
+        for line in file:
+            match = state_re.match(line)
+            if match:
+                state = match.group('state')
+                self.model.add_state(state)
+            else:
+                print('Ошибка! Очередная строка не соответствует шаблону.\n"{}"'.format(line))
+        file.close()
+        self.state_view.refresh_states()
 
     def save_result_to_file(self, file):
         print('controller - save_result_to_file')
 
     def start_processing(self):
-        print('controller - start processing')
+        self.model.add_result('УК РФ, гл.1, ст.1, п.2',
+                               ['штраф 100, 300',
+                                'штраф в размере заработной платы 12, 24',
+                                'исправительные работы 12, 24',
+                                'лишение свободы 48',
+                                'ограничение свободы 48',
+                                'принудительные работы 48'])
+        self.model.add_result('УК РФ, гл.1, ст.1, п.1',
+                               ['штраф 200',
+                                'штраф в размере заработной платы до 18',
+                                'лишение свободы 24',
+                                'исправительные работы 12',
+                                'ограничение свободы 24',
+                                'принудительные работы 24'])
+        self.state_view.result_txt.config(state='normal')
+        self.state_view.result_txt.delete('1.0', END)
+        self.state_view.result_txt.config(state='disabled')
+        line_num = 1
+        self.state_view.result_txt.config(state='normal')
+        for num_rule, rule in enumerate(self.model.results.keys()):
+            self.state_view.result_txt.insert('{}.{}'.format(line_num, 0),
+                                              str(num_rule+1)+'. '+rule+'\n')
+            line_num += 1
+            for num_res, result in enumerate(self.model.results[rule]):
+                self.state_view.result_txt.insert('{}.{}'.format(line_num, 0),
+                                                  str(num_res + 1)+') '+result+'\n')
+                line_num += 1
+            self.state_view.result_txt.insert('{}.{}'.format(line_num, 0), '\n')
+            line_num += 1
+        self.state_view.result_txt.config(state='disabled')
 
 
 class RulesView(Frame):
@@ -454,22 +496,22 @@ class StatesView(Frame):
                                 text='РЕШИТЬ',
                                 bg='black',
                                 fg='white',
-                                state='disable',
+                                state='disabled',
                                 command=self.controller.start_processing,
                                 **config)
         self.save_result_but = Button(frame_result_child_btn,
                                       bd=3,
                                       text='Сохранить',
                                       bg='#ffddaa',
-                                      state='disable',
+                                      state='disabled',
                                       command=self.save_result,
                                       **config)
         self.clear_result_but = Button(frame_result_child_btn,
                                        bd=3,
                                        text='Очистить',
                                        bg='#eebebe',
-                                       state='disable',
-                                       command=self.save_result,
+                                       state='disabled',
+                                       command=self.clear_result,
                                        **config)
         # PACKED result text, start button, save result button
         Label(frame_result_parent, text='Результаты:', **config).pack(side='top', padx=5, anchor=W)
@@ -514,26 +556,38 @@ class StatesView(Frame):
             self.states_txt.config(state='normal')
             self.states_txt.delete('1.0', END)
             self.states_txt.config(state='disable')
+
         if self.model.get_results_amount() > 0:
             self.save_result_but.config(state='normal')
+            self.clear_result_but.config(state='normal')
         else:
             self.save_result_but.config(state='disable')
+            self.clear_result_but.config(state='disable')
 
     def save_states(self):
-        print('view - save states')
-        file = None
-        self.controller.save_states_to_file(file)
+        if self.model.states:
+            file_var = filedialog.asksaveasfile(mode='w',
+                                                defaultextension=".states",
+                                                filetypes=[('states files', '.states'), ('all files', '.*')],
+                                                title="Сохранение состояния. Введите имя файла.")
+            if file_var:
+                self.controller.save_states_to_file(file_var)
 
     def load_states(self):
-        print('view - load states')
-        file = None
-        self.controller.load_states_from_file(file)
+        filename = filedialog.askopenfilename(filetypes=[('*.states files', '*.states')])
+        if filename:
+            file_var = open(filename, 'r')
+            self.controller.load_states_from_file(file_var)
 
     def save_result(self):
         print('view - save result')
         file = None
         self.controller.save_result_to_file(file)
 
+    def clear_result(self):
+        self.states_txt.config(state='normal')
+        self.states_txt.delete('1.0', END)
+        self.states_txt.config(state='disabled')
 
 expert_sys_model = ExpertSysModel()
 expert_sys_controller = ExpertSysController(expert_sys_model)
