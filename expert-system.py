@@ -46,6 +46,7 @@ class ExpertSysModel:
     def get_results_amount(self):
         return len(self.results)
 
+
 class ExpertSysController:
     ''' Управления функциями МОДЕЛИ. Данные методы вызываются из ВИДА '''
     def __init__(self, model=None):
@@ -181,7 +182,12 @@ class ExpertSysController:
         self.state_view.refresh_states()
 
     def save_result_to_file(self, file):
-        print('controller - save_result_to_file')
+        for num_rule, rule in enumerate(self.model.results.keys()):
+            print('{}. {}'.format(num_rule + 1, rule), file=file)
+            for num_res, result in enumerate(self.model.results[rule]):
+                print('{}) {}'.format(num_res+1, result), file=file)
+            print(file=file)
+        file.close()
 
     def start_processing(self):
         self.model.add_result('УК РФ, гл.1, ст.1, п.2',
@@ -198,25 +204,15 @@ class ExpertSysController:
                                 'исправительные работы 12',
                                 'ограничение свободы 24',
                                 'принудительные работы 24'])
-        self.state_view.result_txt.config(state='normal')
-        self.state_view.result_txt.delete('1.0', END)
-        self.state_view.result_txt.config(state='disabled')
-        line_num = 1
-        self.state_view.result_txt.config(state='normal')
-        for num_rule, rule in enumerate(self.model.results.keys()):
-            self.state_view.result_txt.insert('{}.{}'.format(line_num, 0),
-                                              str(num_rule+1)+'. '+rule+'\n')
-            line_num += 1
-            for num_res, result in enumerate(self.model.results[rule]):
-                self.state_view.result_txt.insert('{}.{}'.format(line_num, 0),
-                                                  str(num_res + 1)+') '+result+'\n')
-                line_num += 1
-            self.state_view.result_txt.insert('{}.{}'.format(line_num, 0), '\n')
-            line_num += 1
-        self.state_view.result_txt.config(state='disabled')
+        self.state_view.refresh_results()
+
+    def clear_results(self):
+        self.model.results = dict()
+        self.state_view.refresh_results()
 
 
 class RulesView(Frame):
+    ''' Интерфейс для управления созданием и отображением ПРАВИЛ'''
     def __init__(self, model=None, controller=None, master=None, **config):
         self.model = model
         self.controller = controller
@@ -388,6 +384,7 @@ class RulesView(Frame):
 
 
 class StatesView(Frame):
+    ''' Интерфейс для управления созданием и отображением СОСТОЯНИЙ и РЕЗУЛЬТАТОВ'''
     def __init__(self, model=None, controller=None, master=None, **config):
         self.model = model
         self.controller = controller
@@ -564,8 +561,31 @@ class StatesView(Frame):
             self.save_result_but.config(state='disable')
             self.clear_result_but.config(state='disable')
 
+    def refresh_results(self):
+        self.result_txt.config(state='normal')
+        self.result_txt.delete('1.0', END)
+        on_off_widgets = [self.save_result_but, self.clear_result_but]
+        if self.model.get_results_amount() > 0:
+            for widget in on_off_widgets:
+                widget.config(state='normal')
+            line_num = 1
+            for num_rule, rule in enumerate(self.model.results.keys()):
+                self.result_txt.insert('{}.{}'.format(line_num, 0),
+                                                  str(num_rule+1)+'. '+rule+'\n')
+                line_num += 1
+                for num_res, result in enumerate(self.model.results[rule]):
+                    self.result_txt.insert('{}.{}'.format(line_num, 0),
+                                                      str(num_res + 1)+') '+result+'\n')
+                    line_num += 1
+                self.result_txt.insert('{}.{}'.format(line_num, 0), '\n')
+                line_num += 1
+        else:
+            for widget in on_off_widgets:
+                widget.config(state='disabled')
+        self.result_txt.config(state='disabled')
+
     def save_states(self):
-        if self.model.states:
+        if self.model.get_states_amount() > 0:
             file_var = filedialog.asksaveasfile(mode='w',
                                                 defaultextension=".states",
                                                 filetypes=[('states files', '.states'), ('all files', '.*')],
@@ -580,14 +600,17 @@ class StatesView(Frame):
             self.controller.load_states_from_file(file_var)
 
     def save_result(self):
-        print('view - save result')
-        file = None
-        self.controller.save_result_to_file(file)
+        if self.model.get_results_amount() > 0:
+            file_var = filedialog.asksaveasfile(mode='w',
+                                                defaultextension=".results",
+                                                filetypes=[('results files', '.results'), ('all files', '.*')],
+                                                title="Сохранение результата. Введите имя файла.")
+            if file_var:
+                self.controller.save_result_to_file(file_var)
 
     def clear_result(self):
-        self.states_txt.config(state='normal')
-        self.states_txt.delete('1.0', END)
-        self.states_txt.config(state='disabled')
+        self.controller.clear_results()
+
 
 expert_sys_model = ExpertSysModel()
 expert_sys_controller = ExpertSysController(expert_sys_model)
